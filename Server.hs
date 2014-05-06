@@ -1,4 +1,5 @@
 import System.IO
+import System.IO.Error
 import Data.List
 import Data.List.Split
 import Network
@@ -18,6 +19,20 @@ portNumber = 8080
 
 rootDir :: FilePath
 rootDir = "/home/marg_do/work/haskell/Server/www"
+
+-- Development
+header :: String
+header = "Content-type: text/html\n\n"
+
+-- General
+assoc :: Eq a => a -> [(a, b)] -> Maybe (a, b)
+assoc itm [] = Nothing
+assoc itm lst = if (fst tpl) == itm then Just tpl
+                else assoc itm $ tail lst
+  where tpl = head lst
+
+fromJust :: Maybe a -> a
+fromJust (Just x) = x
 
 -- Logger
 logStartServer :: PortNumber -> Log
@@ -50,6 +65,54 @@ parseRequest req = map reqlToEnv $ reqToReql req
 
 --------------------------------------------------
 
+main :: IO ()
+main = do
+  withSocketsDo $ do
+    serverSocket <- listenOn (PortNumber portNumber)
+    putLogLn $ logStartServer portNumber
+    acceptLoop serverSocket `finally` sClose serverSocket
+
+putLogLn :: Log -> IO ()
+putLogLn = putStrLn
+
+acceptLoop socket = do
+  (clientHandle, clientHost, clientPort) <- accept socket
+  forkOS $ httpHandler clientHandle
+  acceptLoop socket
+
+hGetRequest handle acc = do
+  l <- hGetLine handle
+  if l == "\n" then return acc
+    else hGetRequest handle $ acc ++ l
+  `catch` (\e -> if isEOFError e
+                   then return acc
+                   else ioError e)
+
+httpHandler handle = do
+  sequence_ $ repeat $ do {
+    request <- hGetLine handle;
+--    request <- hGetRequest handle "";
+    putLogLn "Access Accepted";
+    hPutStrLn handle header;
+    hPutStrLn handle request;
+    putLogLn (if request == "\n" then "CR" else request);
+    hFlush handle;
+    putLogLn "Access End";
+    hClose handle
+                          }
+    `catch` (\(SomeException e) -> return ())
+    `finally` hClose handle
+
+-- Old
+echoLoop handle = do
+  sequence_ (repeat (do {
+                        request <- hGetLine handle;
+                        if isRequestGet request then hPutStaticFile handle (reqFilePath $ (lines request !! 0)) else nilIO;
+                            hFlush handle
+                        }))
+    `catch` (\(SomeException e) -> return ())
+    `finally` hClose handle
+    
 onError :: String -> SomeException ->  IO String
 onError mes e = do
   putStrLn mes
@@ -60,29 +123,6 @@ hPutStaticFile clientHandle filepath = do
   contents <- catch (readFile filepath) (onError ("404 Error" ++ (show filepath)))
   hPutStrLn clientHandle contents
 
-putLogLn :: Log -> IO ()
-putLogLn = putStrLn
-
-main :: IO ()
-main = do
-  withSocketsDo $ do
-    serverSocket <- listenOn (PortNumber portNumber)
-    putLogLn $ logStartServer portNumber
-    acceptLoop serverSocket `finally` sClose serverSocket
-
-acceptLoop socket = do
-  (clientHandle, clientHost, clientPort) <- accept socket
-  forkOS $ echoLoop clientHandle
-  acceptLoop socket
-
-echoLoop handle = do
-  sequence_ (repeat (do {
-                        request <- hGetLine handle;
-                        if isRequestGet request then hPutStaticFile handle (reqFilePath $ (lines request !! 0)) else nilIO;
-                            hFlush handle
-                        }))
-    `catch` (\(SomeException e) -> return ())
-    `finally` hClose handle
 
 nilIO :: IO ()
 nilIO = do
