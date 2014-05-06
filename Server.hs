@@ -22,15 +22,22 @@ parseToPath reql = splitOn " " reql !! 1
 reqFilePath :: RequestLine -> FilePath
 reqFilePath reql = rootDir ++ parseToPath reql
 
+isRequestGet :: RequestLine -> Bool
+isRequestGet reql = if method == "GET" then True
+                    else False
+  where method = splitOn " " reql !! 0
 
 
+
+onError :: String -> SomeException ->  IO String
+onError mes e = do
+  putStrLn mes
+  return mes
 
 hPutStaticFile :: Handle -> FilePath -> IO ()
 hPutStaticFile clientHandle filepath = do
-  handle <- openFile filepath ReadMode
-  contents <- hGetContents handle
+  contents <- catch (readFile filepath) (onError ("404 Error" ++ (show filepath)))
   hPutStrLn clientHandle contents
-  hClose handle
 
 putLogLn :: Log -> IO ()
 putLogLn = putStrLn
@@ -50,8 +57,12 @@ acceptLoop socket = do
 echoLoop handle = do
   sequence_ (repeat (do {
                         request <- hGetLine handle;
-                        hPutStaticFile handle (reqFilePath $ (lines request !! 0));
+                        if isRequestGet request then hPutStaticFile handle (reqFilePath $ (lines request !! 0)) else nilIO;
                             hFlush handle
                         }))
     `catch` (\(SomeException e) -> return ())
     `finally` hClose handle
+
+nilIO :: IO ()
+nilIO = do
+  return ()
