@@ -1,0 +1,2 @@
+# Haskell httpd
+Haskellの練習のために作っている簡易HTTPサーバーです
