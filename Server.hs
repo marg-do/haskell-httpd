@@ -80,6 +80,7 @@ acceptLoop socket = do
   forkOS $ httpHandler clientHandle
   acceptLoop socket
 
+{--
 hGetRequest handle acc = do
   l <- hGetLine handle
   if l == "\n" then return acc
@@ -87,19 +88,29 @@ hGetRequest handle acc = do
   `catch` (\e -> if isEOFError e
                    then return acc
                    else ioError e)
+--}
+
+hGetRequest handle = do
+  l <- hGetLine handle
+  l2 <- hGetLine handle
+  l3 <- hGetLine handle
+  l4 <- hGetLine handle
+  l5 <- hGetLine handle
+  return $ l ++ l2 ++ l3 ++ l4 ++ l5
 
 httpHandler handle = do
   sequence_ $ repeat $ do {
-    request <- hGetLine handle;
+--    request <- hGetLine handle;
 --    request <- hGetRequest handle "";
+    request <- hGetRequest handle;
     putLogLn "Access Accepted";
     hPutStrLn handle header;
     hPutStrLn handle request;
-    putLogLn (if request == "\n" then "CR" else request);
+    putLogLn request;
     hFlush handle;
     putLogLn "Access End";
     hClose handle
-                          }
+    }
     `catch` (\(SomeException e) -> return ())
     `finally` hClose handle
 
