@@ -88,7 +88,6 @@ hGetRequest handle acc = do
   `catch` (\e -> if isEOFError e
                    then return acc
                    else ioError e)
---}
 
 hGetRequest handle = do
   l <- hGetLine handle
@@ -97,6 +96,15 @@ hGetRequest handle = do
   l4 <- hGetLine handle
   l5 <- hGetLine handle
   return $ l ++ l2 ++ l3 ++ l4 ++ l5
+--}
+
+hGetRequest handle = do
+  line <- hGetLine handle
+  if null line
+    then return ""
+    else do
+    line2 <- hGetRequest handle
+    return $ line2 ++ line ++ "\n"
 
 httpHandler handle = do
   sequence_ $ repeat $ do {
